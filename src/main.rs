@@ -1,14 +1,14 @@
-use helpers::print_time;
-use rand::{thread_rng, Rng};
-
 mod helpers;
 
-const MAX_RANDOM_NUMBER: i32 = 512;
-const NUMBER_COUNT: usize = 16;
+use helpers::print_time;
+use lambda_runtime;
+use log;
+use simple_logger;
 
 fn merge(left: &[i32], right: &[i32]) -> Vec<i32> {
-    let mut i = 0;
-    let mut j = 0;
+    // let mut i = 0; let mut j = 0;
+
+    let (mut i, mut j) = (0, 0);
 
     let mut merged: Vec<i32> = Vec::with_capacity(left.len() + right.len());
 
@@ -22,9 +22,11 @@ fn merge(left: &[i32], right: &[i32]) -> Vec<i32> {
         }
     }
 
+    // IF I HAVE TIME...
     // 1 - two statements
     // 2 - if-else inside `append()`
     // 3 - `match` inside `append()`
+
     // let mut leftover = if i < left.len() {
     //     left[i..left.len()].to_vec()
     // } else {
@@ -55,20 +57,29 @@ fn merge_sort(arr: &[i32]) -> Vec<i32> {
     }
 }
 
-fn main() {
-    print_time("STARTING");
+async fn my_handler(
+    e: lambda_runtime::LambdaEvent<Vec<i32>>,
+) -> Result<Vec<i32>, lambda_runtime::Error> {
+    print_time("HANDLER STARTING!");
 
-    let mut rng = thread_rng();
+    println!("NUMBERS: {:?}", &e.payload);
 
-    let mut arr: [i32; NUMBER_COUNT] = [-1; NUMBER_COUNT];
-    for i in 0..NUMBER_COUNT {
-        arr[i] = rng.gen_range(1..MAX_RANDOM_NUMBER);
-    }
-
-    println!("NUMBERS: {:?}", arr);
-
-    let sorted_numbers = merge_sort(&arr);
+    let sorted_numbers = merge_sort(&e.payload);
     println!("{:?}", sorted_numbers);
 
-    print_time("SORTED!");
+    print_time("HANDLER ENDING! Sorted!");
+
+    return Ok(sorted_numbers);
+}
+
+#[tokio::main]
+async fn main() -> Result<(), lambda_runtime::Error> {
+    print_time("MAIN STARTING");
+    simple_logger::init_with_level(log::Level::Info)?;
+
+    lambda_runtime::run(lambda_runtime::service_fn(my_handler)).await?;
+
+    print_time("MAIN ENDING!");
+
+    Ok(())
 }

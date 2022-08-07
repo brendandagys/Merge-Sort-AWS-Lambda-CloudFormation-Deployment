@@ -1,10 +1,20 @@
 [package]
 name = "merge-sort"
 version = "0.1.0"
+authors = ["Brendan Dagys <brendandagys@gmail.com>"]
 edition = "2021"
+autobin = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 chrono = "0.4"
-rand = "0.8"
+lambda_runtime = "0.6"
+log = "0.4"
+serde = { version = "1.0", features = ['derive'] }
+simple_logger = "2.2"
+tokio = "1"
+
+[[bin]]
+name = "bootstrap"
+path = "src/main.rs"
