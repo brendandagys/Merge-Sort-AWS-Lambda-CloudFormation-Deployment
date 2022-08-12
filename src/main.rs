@@ -3,11 +3,11 @@ mod helpers;
 use helpers::print_time;
 use lambda_runtime;
 use log;
+use serde::{Deserialize, Serialize};
 use simple_logger;
 
 fn merge(left: &[i32], right: &[i32]) -> Vec<i32> {
     // let mut i = 0; let mut j = 0;
-
     let (mut i, mut j) = (0, 0);
 
     let mut merged: Vec<i32> = Vec::with_capacity(left.len() + right.len());
@@ -57,19 +57,30 @@ fn merge_sort(arr: &[i32]) -> Vec<i32> {
     }
 }
 
-async fn my_handler(
-    e: lambda_runtime::LambdaEvent<Vec<i32>>,
-) -> Result<Vec<i32>, lambda_runtime::Error> {
+#[derive(Debug, Deserialize, Clone)]
+struct NumberList {
+    numbers: Vec<i32>,
+}
+#[derive(Serialize, Clone)]
+struct CustomOutput {
+    message: String,
+}
+
+async fn handler(
+    e: lambda_runtime::LambdaEvent<NumberList>,
+) -> Result<CustomOutput, lambda_runtime::Error> {
     print_time("HANDLER STARTING!");
+    println!("{:?}", e);
+    println!("NUMBERS: {:?}", &e.payload.numbers);
 
-    println!("NUMBERS: {:?}", &e.payload);
-
-    let sorted_numbers = merge_sort(&e.payload);
+    let sorted_numbers = merge_sort(&e.payload.numbers);
     println!("{:?}", sorted_numbers);
 
     print_time("HANDLER ENDING! Sorted!");
 
-    return Ok(sorted_numbers);
+    return Ok(CustomOutput {
+        message: format!("{:?}", sorted_numbers),
+    });
 }
 
 #[tokio::main]
@@ -77,7 +88,7 @@ async fn main() -> Result<(), lambda_runtime::Error> {
     print_time("MAIN STARTING");
     simple_logger::init_with_level(log::Level::Info)?;
 
-    lambda_runtime::run(lambda_runtime::service_fn(my_handler)).await?;
+    lambda_runtime::run(lambda_runtime::service_fn(handler)).await?;
 
     print_time("MAIN ENDING!");
 

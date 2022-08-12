@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  Domain:
+    Type: String
+    Default: sort.brendandagys.com.
+    Description: Lambda function DNS endpoint.
+
+  HostedZoneId:
+    Type: String
+    Default: Z1048063LC3J2IKH5GGI
+    Description: Hosted Zone in which to deploy the DNS record.
+
+  LambdaFunctionName:
+    Type: String
+    Default: rust-merge-sort
+    Description: Name for the created function in AWS Lambda.
+
+  TlsCertificate:
+    Type: String
+    Default: arn:aws:acm:us-east-1:708746137251:certificate/d61599f4-ca74-4bb7-893f-ed00e147d33c
+    Description: ARN of the TLS certificate used for HTTPS capability.
+
+Resources:
+  MergeSortFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: rust-merge-sort
+        S3Key: bootstrap.zip
+      Environment:
+        Variables:
+          RUST_BACKTRACE: 1
+      FunctionName: !Ref LambdaFunctionName
+      Handler: bootstrap
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: provided.al2
+      TracingConfig:
+        Mode: Active
+
+  MergeSortFunctionVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref MergeSortFunction
+
+  MergeSortFunctionResourcePolicy:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunctionUrl
+      FunctionName: !Ref MergeSortFunction
+      FunctionUrlAuthType: NONE
+      Principal: "*"
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - edgelambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: Allows the Lambda function minimal permissions to CloudWatch and X-Ray
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+      RoleName: !Sub "${AWS::Region}-rust-merge-sort"
+
+  LambdaPublicUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt MergeSortFunction.Arn
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref Domain
+        Comment: "Distribution for merge-sort Lambda function deployed via CloudFormation."
+        DefaultCacheBehavior:
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          LambdaFunctionAssociations:
+            - EventType: viewer-request
+              IncludeBody: true
+              LambdaFunctionARN: !Ref MergeSortFunctionVersion
+          TargetOriginId: !Ref MergeSortFunction
+          ViewerProtocolPolicy: redirect-to-https
+        DefaultRootObject: ""
+        Enabled: true
+        PriceClass: PriceClass_100
+        HttpVersion: http2
+        IPV6Enabled: false
+        Origins:
+          - Id: !Ref MergeSortFunction
+            DomainName:
+              !Select [2, !Split ["/", !GetAtt LambdaPublicUrl.FunctionUrl]]
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref TlsCertificate
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        HostedZoneId: !Ref HostedZoneId
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref Domain
+      Type: A
