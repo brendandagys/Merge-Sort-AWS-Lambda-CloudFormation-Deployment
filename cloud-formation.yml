@@ -3,7 +3,7 @@ AWSTemplateFormatVersion: 2010-09-09
 Parameters:
   Domain:
     Type: String
-    Default: sort.brendandagys.com.
+    Default: sort.brendandagys.com
     Description: Lambda function DNS endpoint.
 
   HostedZoneId:
@@ -22,6 +22,35 @@ Parameters:
     Description: ARN of the TLS certificate used for HTTPS capability.
 
 Resources:
+  ApiGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: Rust merge-sort Lambda function API.
+      ProtocolType: HTTP
+
+  ApiGatewayStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref ApiGateway
+      StageName: Live
+      Description: "`Live` stage."
+      AutoDeploy: true
+
+  ApiGatewayMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: !Ref Domain
+      ApiId: !Ref ApiGateway
+      Stage: !Ref ApiGatewayStage
+
+  ApiGatewayDomainName:
+    Type: AWS::ApiGatewayV2::DomainName
+    Properties:
+      DomainName: !Ref Domain
+      DomainNameConfigurations:
+        - EndpointType: REGIONAL
+          CertificateArn: !Ref TlsCertificate
+
   MergeSortFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -46,10 +75,9 @@ Resources:
   MergeSortFunctionResourcePolicy:
     Type: AWS::Lambda::Permission
     Properties:
-      Action: lambda:InvokeFunctionUrl
+      Action: lambda:InvokeFunction
       FunctionName: !Ref MergeSortFunction
-      FunctionUrlAuthType: NONE
-      Principal: "*"
+      Principal: apigateway.amazonaws.com
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -61,61 +89,49 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
-                - edgelambda.amazonaws.com
             Action:
               - sts:AssumeRole
-      Description: Allows the Lambda function minimal permissions to CloudWatch and X-Ray
+      Description: Allows the Lambda function minimal permissions to CloudWatch and X-Ray.
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
       RoleName: !Sub "${AWS::Region}-rust-merge-sort"
 
-  LambdaPublicUrl:
-    Type: AWS::Lambda::Url
+  ApiGatewayIntegration:
+    Type: AWS::ApiGatewayV2::Integration
     Properties:
-      AuthType: NONE
-      TargetFunctionArn: !GetAtt MergeSortFunction.Arn
+      ApiId: !Ref ApiGateway
+      Description: Lambda proxy integration.
+      IntegrationMethod: POST
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref "AWS::Partition"
+          - ":apigateway:"
+          - !Ref "AWS::Region"
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt MergeSortFunction.Arn
+          - /invocations
+      PayloadFormatVersion: "2.0"
 
-  CloudFrontDistribution:
-    Type: AWS::CloudFront::Distribution
+  ApiGatewayRoute:
+    Type: AWS::ApiGatewayV2::Route
     Properties:
-      DistributionConfig:
-        Aliases:
-          - !Ref Domain
-        Comment: "Distribution for merge-sort Lambda function deployed via CloudFormation."
-        DefaultCacheBehavior:
-          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
-          LambdaFunctionAssociations:
-            - EventType: viewer-request
-              IncludeBody: true
-              LambdaFunctionARN: !Ref MergeSortFunctionVersion
-          TargetOriginId: !Ref MergeSortFunction
-          ViewerProtocolPolicy: redirect-to-https
-        DefaultRootObject: ""
-        Enabled: true
-        PriceClass: PriceClass_100
-        HttpVersion: http2
-        IPV6Enabled: false
-        Origins:
-          - Id: !Ref MergeSortFunction
-            DomainName:
-              !Select [2, !Split ["/", !GetAtt LambdaPublicUrl.FunctionUrl]]
-            CustomOriginConfig:
-              HTTPSPort: 443
-              OriginProtocolPolicy: https-only
-              OriginSSLProtocols:
-                - TLSv1.2
-        ViewerCertificate:
-          AcmCertificateArn: !Ref TlsCertificate
-          SslSupportMethod: sni-only
-          MinimumProtocolVersion: TLSv1.2_2021
+      ApiId: !Ref ApiGateway
+      RouteKey: "POST"
+      AuthorizationType: NONE
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref ApiGatewayIntegration
 
   DnsRecord:
     Type: AWS::Route53::RecordSet
     Properties:
       AliasTarget:
-        HostedZoneId: !Ref HostedZoneId
-        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        DNSName: !GetAtt ApiGatewayDomainName.RegionalDomainName
+        HostedZoneId: !GetAtt ApiGatewayDomainName.RegionalHostedZoneId
       HostedZoneId: !Ref HostedZoneId
       Name: !Ref Domain
       Type: A

@@ -1,10 +1,12 @@
 mod helpers;
+mod types;
 
+use crate::types::{CustomOutput, ParsedRequestBody};
 use helpers::print_time;
 use lambda_runtime;
 use log;
-use serde::{Deserialize, Serialize};
 use simple_logger;
+use types::ApiGatewayEvent;
 
 fn merge(left: &[i32], right: &[i32]) -> Vec<i32> {
     // let mut i = 0; let mut j = 0;
@@ -57,30 +59,23 @@ fn merge_sort(arr: &[i32]) -> Vec<i32> {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-struct NumberList {
-    numbers: Vec<i32>,
-}
-#[derive(Serialize, Clone)]
-struct CustomOutput {
-    message: String,
-}
-
 async fn handler(
-    e: lambda_runtime::LambdaEvent<NumberList>,
+    e: lambda_runtime::LambdaEvent<ApiGatewayEvent>,
 ) -> Result<CustomOutput, lambda_runtime::Error> {
     print_time("HANDLER STARTING!");
-    println!("{:?}", e);
-    println!("NUMBERS: {:?}", &e.payload.numbers);
+    // println!("{:?}", e);
 
-    let sorted_numbers = merge_sort(&e.payload.numbers);
+    let json_numbers = serde_json::from_str::<ParsedRequestBody>(&e.payload.body)
+        .expect("Could not parse string into JSON!");
+
+    let sorted_numbers = merge_sort(&json_numbers.numbers);
     println!("{:?}", sorted_numbers);
 
     print_time("HANDLER ENDING! Sorted!");
 
-    return Ok(CustomOutput {
-        message: format!("{:?}", sorted_numbers),
-    });
+    let response = CustomOutput { sorted_numbers };
+
+    Ok(response)
 }
 
 #[tokio::main]
@@ -89,7 +84,6 @@ async fn main() -> Result<(), lambda_runtime::Error> {
     simple_logger::init_with_level(log::Level::Info)?;
 
     lambda_runtime::run(lambda_runtime::service_fn(handler)).await?;
-
     print_time("MAIN ENDING!");
 
     Ok(())

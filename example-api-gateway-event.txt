@@ -1,0 +1,57 @@
+LambdaEvent {
+    payload: Object({
+        "body": String("{\n    \"numbers\": [ 3, 2, 1, 5, 4 ]\n}"),
+        "headers": Object({
+            "accept": String("*/*"),
+            "accept-encoding": String("gzip, deflate, br"),
+            "cache-control": String("no-cache"),
+            "content-length": String("36"),
+            "content-type": String("application/json"),
+            "host": String("sort.brendandagys.com"),
+            "postman-token": String("bc11a97e-b68d-42c3-259c-134dfr54aee2"),
+            "user-agent": String("PostmanRuntime/7.29.2"),
+            "x-amzn-trace-id": String("Root=1-62t85580-2697545e53649701589fcd0f"),
+            "x-forwarded-for": String("99.220.113.201"),
+            "x-forwarded-port": String("443"),
+            "x-forwarded-proto": String("https")
+        }),
+        "isBase64Encoded": Bool(false),
+        "rawPath": String("/Live/"),
+        "rawQueryString": String(""),
+        "requestContext": Object({
+            "accountId": String("708346212251"),
+            "apiId": String("0fbl2fghuh"),
+            "domainName": String("sort.brendandagys.com"),
+            "domainPrefix": String("sort"),
+            "http": Object({
+                "method": String("POST"),
+                "path": String("/Live/"),
+                "protocol": String("HTTP/1.1"),
+                "sourceIp": String("99.220.113.201"),
+                "userAgent": String("PostmanRuntime/7.29.2")
+            }),
+            "requestId": String("W1JMFh0doGFDJUw="),
+            "routeKey": String("POST /"),
+            "stage": String("Live"),
+            "time": String("14/Aug/2022:01:53:04 +0000"),
+            "timeEpoch": Number(1660441984388)
+        }),
+        "routeKey": String("POST /"),
+        "version": String("2.0")
+    }),
+    context: Context {
+        request_id: "39cecad3-c20b-453e-9a9d-134d462ad72b",
+        deadline: 1660441347414,
+        invoked_function_arn: "arn:aws:lambda:us-east-1:708743327251:function:rust-merge-sort",
+        xray_trace_id: "Root=1-62f85580-3735873e62b6f8cf1f32524f;Parent=0cdd458de3a1a3c6;Sampled=1",
+        client_context: None,
+        identity: None,
+        env_config: Config {
+            function_name: "rust-merge-sort",
+            memory: 128,
+            version: "$LATEST",
+            log_stream: "2022/08/14/[$LATEST]e05a99a6135672fea2e5e03825437698",
+            log_group: "/aws/lambda/rust-merge-sort"
+        }
+    }
+}
