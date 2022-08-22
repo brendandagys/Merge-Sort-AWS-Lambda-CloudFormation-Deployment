@@ -39,6 +39,7 @@ pub struct ApiGatewayRequestContext {
 #[derive(Clone, Debug, Deserialize)]
 pub struct ParsedRequestBody {
     pub numbers: Vec<i32>,
+    pub name: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
