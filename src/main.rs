@@ -1,12 +1,13 @@
 mod helpers;
 mod types;
 
-use crate::types::{CustomOutput, ParsedRequestBody};
-use helpers::print_time;
-use lambda_runtime;
+use crate::{
+    helpers::print_time,
+    types::{CustomOutput, ParsedRequestBody},
+};
+use lambda_http::{http::StatusCode, service_fn, Body, Response};
 use log;
 use simple_logger;
-use types::ApiGatewayEvent;
 
 fn merge_sorted_arrays(left: &[i32], right: &[i32]) -> Vec<i32> {
     let (mut i, mut j) = (0, 0);
@@ -37,7 +38,6 @@ fn merge_sort(arr: &[i32]) -> Vec<i32> {
     }
 
     let middle = arr.len() / 2;
-    println!("Middle: {middle}");
 
     let left = merge_sort(&arr[..middle]);
     let right = merge_sort(&arr[middle..]);
@@ -45,34 +45,42 @@ fn merge_sort(arr: &[i32]) -> Vec<i32> {
     merge_sorted_arrays(&left, &right)
 }
 
-async fn handler(
-    e: lambda_runtime::LambdaEvent<ApiGatewayEvent>,
-) -> Result<CustomOutput, lambda_runtime::Error> {
-    print_time("HANDLER STARTING!");
+async fn handler(e: lambda_http::Request) -> Result<Response<Body>, lambda_http::Error> {
     println!("{:?}", e);
 
-    let request_body = serde_json::from_str::<ParsedRequestBody>(&e.payload.body)
-        .expect("Could not parse string into JSON!");
+    match e.body() {
+        Body::Text(body) => match serde_json::from_str::<ParsedRequestBody>(body) {
+            Ok(body) => {
+                println!("NAME: {}", body.name);
 
-    println!("NAME: {}", request_body.name);
+                let sorted_numbers = merge_sort(&body.numbers);
 
-    let sorted_numbers = merge_sort(&request_body.numbers);
-    println!("{:?}", sorted_numbers);
+                println!("SORTED NUMBERS: {:?}", sorted_numbers);
+                print_time("FINISHED!");
 
-    print_time("HANDLER ENDING! Sorted!");
+                return Ok(Response::builder().status(StatusCode::OK).body(Body::Text(
+                    serde_json::to_string(&CustomOutput { sorted_numbers })?,
+                ))?);
+            }
+            Err(e) => {
+                println!("ERROR: {:?}", e);
 
-    let response = CustomOutput { sorted_numbers };
-
-    Ok(response)
+                return Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(
+                    Body::Text(
+                        "Please provide both necessary parameters: `numbers` and `name`.".into(),
+                    ),
+                )?);
+            }
+        },
+        _ => panic!("The provided body was not a `Text` body!"),
+    }
 }
 
 #[tokio::main]
-async fn main() -> Result<(), lambda_runtime::Error> {
-    print_time("MAIN STARTING");
+async fn main() -> Result<(), lambda_http::Error> {
     simple_logger::init_with_level(log::Level::Info)?;
 
-    lambda_runtime::run(lambda_runtime::service_fn(handler)).await?;
-    print_time("MAIN ENDING!");
+    lambda_http::run(service_fn(handler)).await?;
 
     Ok(())
 }

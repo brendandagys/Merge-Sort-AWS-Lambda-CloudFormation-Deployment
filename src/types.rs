@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -60,4 +61,21 @@ pub struct ApiGatewayEvent {
 #[serde(rename_all = "camelCase")]
 pub struct CustomOutput {
     pub sorted_numbers: Vec<i32>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CustomError {
+    pub message: String,
+}
+
+impl std::error::Error for CustomError {
+    // This implementation required `Debug` and `Display` traits
+}
+
+impl std::fmt::Display for CustomError {
+    // Display the error struct as a JSON string
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let err_as_json = json!(self).to_string();
+        write!(f, "{}", err_as_json)
+    }
 }
